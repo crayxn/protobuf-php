@@ -46,6 +46,8 @@ class DescriptorPool
     private $class_to_desc = [];
     private $class_to_enum_desc = [];
     private $proto_to_class = [];
+    private $proto_to_content = [];
+    private $class_to_proto = [];
 
     public static function getGeneratedPool()
     {
@@ -61,6 +63,9 @@ class DescriptorPool
         $files->mergeFromString($data);
 
         foreach($files->getFile() as $file_proto) {
+
+            $this->addContent($file_proto, $data);
+
             $file = FileDescriptor::buildFromProto($file_proto);
 
             foreach ($file->getMessageType() as $desc) {
@@ -190,5 +195,31 @@ class DescriptorPool
             $this->crossLink($desc);
         }
         unset($desc);
+    }
+
+    public function addContent(FileDescriptorProto $file_proto, string $content)
+    {
+        $content = str_replace('\\\\', "\\", $content);
+        $content = str_replace(substr($content, 1, 3), "", $content);
+        if (!isset($this->proto_to_content[$file_proto->getName()])) {
+            $this->proto_to_content[$file_proto->getName()] = $content;
+        }
+        /**
+         * @var ServiceDescriptorProto $item
+         */
+        foreach ($file_proto->getService() as $item) {
+            $this->class_to_proto[$file_proto->getPackage() . "." . $item->getName()] = $file_proto->getName();
+        }
+    }
+
+    public function getContentByProtoName(string $proto)
+    {
+        return $this->proto_to_content[$proto] ?? "";
+    }
+
+    public function getContentByServerName(string $server)
+    {
+        $proto = $this->class_to_proto[$server] ?? "";
+        return $this->proto_to_content[$proto] ?? "";
     }
 }
